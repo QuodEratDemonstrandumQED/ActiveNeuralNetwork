@@ -1,5 +1,3 @@
-#include <iostream>
-
 #include "ActiveNeuralNetwork.hpp"
 
 int main() {

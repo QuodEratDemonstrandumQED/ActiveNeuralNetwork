@@ -85,6 +85,8 @@ public:
         }
 
         for (int i = 0; i < in; i++) for (int t : InConnections[i]) In[i].Axon.push_back(AxonTerminalComponent(&In[i], &Hidden[t]));
+        for (int i = 0; i < hidden; i++) for (int t : Connections[i]) Hidden[i].Axon.push_back(AxonTerminalComponent(&Hidden[i], &Hidden[t]));
+        for (int i = 0; i < out; i++) for (int t : OutConnections[i]) Hidden[t].Axon.push_back(AxonTerminalComponent(&Hidden[t], &Out[i]));
     }
 };
 
