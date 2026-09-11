@@ -26,7 +26,7 @@ public:
     Neuron* Out;
     float Weight;
     float MyelinSheath;
-    std::vector<float[2]> Signals;
+    std::vector<std::array<float, 2>> Signals;
     AxonTerminalComponent(Neuron* in, Neuron* out) : In(in), Out(out), Weight(1), MyelinSheath(1) { }
 };
 
@@ -45,19 +45,19 @@ public:
     float ActivationThreshold;
     float LeakRate;
     Neuron(NeuronType type) : Type(type), Excitation(0), ActivationThreshold(1), LeakRate(1) { }
-    Neuron(NeuronType type, float ActivationThreshold, float LeakRate) : Excitation(0) { }
+    Neuron(NeuronType type, float activation_threshold, float leak_rate) : Type(type), Excitation(0), ActivationThreshold(activation_threshold), LeakRate(leak_rate) { }
 };
 
 
 class NeuralNetwork {
-    std::vector<Neuron> In;
-    std::vector<Neuron> Out;
-    std::vector<Neuron> Hidden;
+    std::vector<Neuron*> In;
+    std::vector<Neuron*> Out;
+    std::vector<Neuron*> Hidden;
 public:
     NeuralNetwork(int in, int out, int hidden) {
-        for (int i = 0; i < in; i++) In.emplace_back(InputNeuron);
-        for (int i = 0; i < hidden; i++) Hidden.emplace_back(HiddenNeuron);
-        for (int i = 0; i < out; i++) Out.emplace_back(OutputNeuron);
+        for (int i = 0; i < in; i++) In.push_back(new Neuron(InputNeuron));
+        for (int i = 0; i < hidden; i++) Hidden.push_back(new Neuron(HiddenNeuron));
+        for (int i = 0; i < out; i++) Out.push_back(new Neuron(OutputNeuron));
 
         std::unordered_map<int, std::vector<int>> InConnections;
         std::unordered_map<int, std::vector<int>> Connections;
@@ -88,9 +88,9 @@ public:
             }
         }
 
-        for (int i = 0; i < in; i++) for (int t : InConnections[i]) In[i].Axon.push_back(AxonTerminalComponent(&In[i], &Hidden[t]));
-        for (int i = 0; i < hidden; i++) for (int t : Connections[i]) Hidden[i].Axon.push_back(AxonTerminalComponent(&Hidden[i], &Hidden[t]));
-        for (int i = 0; i < out; i++) for (int t : OutConnections[i]) Hidden[t].Axon.push_back(AxonTerminalComponent(&Hidden[t], &Out[i]));
+        for (int i = 0; i < in; i++) for (int t : InConnections[i]) In[i]->Axon.push_back(AxonTerminalComponent(In[i], Hidden[t]));
+        for (int i = 0; i < hidden; i++) for (int t : Connections[i]) Hidden[i]->Axon.push_back(AxonTerminalComponent(Hidden[i], Hidden[t]));
+        for (int i = 0; i < out; i++) for (int t : OutConnections[i]) Hidden[t]->Axon.push_back(AxonTerminalComponent(Hidden[t], Out[i]));
     }
     NeuralNetwork(std::string fpath) {
         std::ifstream File(fpath);
@@ -103,7 +103,7 @@ public:
         std::string FileContents = buf.str();
         File.close();
         NeuronType cType = InputNeuron;
-        float ActivationThreshold;
+        float ActivationThreshold = 0;
         std::string working_on = "";
         int o;
         for (int i = 0; i < FileContents.length(); i++) {
@@ -122,25 +122,27 @@ public:
                         case OutputNeuron:
                             throw std::invalid_argument("Invalid file formatting for importing of weights for neural network. File path: " + fpath);
                     }
+                    break;
                 case ' ':
-                    if (working_on.empty()) continue; else if (ActivationThreshold > 0) {
+                    if (working_on.empty()) continue; if (ActivationThreshold > 0) {
                         switch (cType) {
                             case InputNeuron:
-                                In.emplace_back(cType, ActivationThreshold, std::stoi(working_on));
+                                In.push_back(new Neuron(cType, ActivationThreshold, std::stof(working_on)));
                                 break;
                             case HiddenNeuron:
-                                Hidden.emplace_back(cType, ActivationThreshold, std::stoi(working_on));
+                                Hidden.push_back(new Neuron(cType, ActivationThreshold, std::stof(working_on)));
                                 break;
                             case OutputNeuron:
-                                Out.emplace_back(cType, ActivationThreshold, std::stoi(working_on));
+                                Out.push_back(new Neuron(cType, ActivationThreshold, std::stof(working_on)));
                                 break;
                         }
-                    } else ActivationThreshold = std::stoi(working_on);
+                        ActivationThreshold = 0;
+                    } else ActivationThreshold = std::stof(working_on);
                     working_on = "";
                     break;
                 case '~':
                     breakout = true;
-                    o = i;
+                    o = i + 1;
                     break;
                 default:
                     working_on += c;
@@ -152,22 +154,27 @@ public:
         for (int i = o; i < FileContents.length(); i++) {
             char c = FileContents[i];
             switch (c) {
-                case '>':
+            case '>':
                     a = std::stoi(working_on);
                     working_on = "";
                     break;
                 case ' ': {
+                    if (working_on.empty()) break;
                     int b = std::stoi(working_on);
                     working_on = "";
-                    if (a < In.size()) In[a].Axon.emplace_back(&In[a], &Hidden[b]);
-                    else if (b > Hidden.size()) Hidden[a].Axon.emplace_back(&Hidden[a], &Out[b-Hidden.size()]);
-                    else Hidden[a].Axon.emplace_back(&Hidden[a], &Hidden[b]);
+                    if (a < In.size()) In[a]->Axon.emplace_back(In[a], Hidden[b]);
+                    else if (b >= Hidden.size()) Hidden[a - In.size()]->Axon.emplace_back(Hidden[a - In.size()], Out[b - Hidden.size()]);
+                    else Hidden[a - In.size()]->Axon.emplace_back(Hidden[a - In.size()], Hidden[b]);
                     break;
-                }
-                default:
+                } default:
                     working_on += c;
             }
         }
+    }
+    ~NeuralNetwork() {
+        for (Neuron* n : In) delete n;
+        for (Neuron* n : Hidden) delete n;
+        for (Neuron* n : Out) delete n;
     }
     void Export(std::string fpath) {
         std::ofstream File(fpath);
@@ -175,17 +182,17 @@ public:
             std::cerr << "Error creating or opening file with path: " + fpath << std::endl;
             return;
         }
-        for (Neuron n : In) File << n.ActivationThreshold << " " << n.LeakRate << " ";
+        for (Neuron* n : In) File << n->ActivationThreshold << " " << n->LeakRate << " ";
         File << "| ";
-        for (Neuron n : Hidden) File << n.ActivationThreshold << " " << n.LeakRate << " ";
+        for (Neuron* n : Hidden) File << n->ActivationThreshold << " " << n->LeakRate << " ";
         File << "| ";
-        for (Neuron n : Out) File << n.ActivationThreshold << " " << n.LeakRate << " ";
+        for (Neuron* n : Out) File << n->ActivationThreshold << " " << n->LeakRate << " ";
         File << "~ ";
-        for (int i = 0; i < In.size(); i++) for (AxonTerminalComponent ac : In[i].Axon) File << i << ">" << std::distance(Hidden.begin(), std::find(Hidden.begin(), Hidden.end(), *ac.Out)) << " ";
-        for (int i = 0; i < Hidden.size(); i++) for (AxonTerminalComponent ac : Hidden[i].Axon) {
-            auto it = std::find(Hidden.begin(), Hidden.end(), *ac.Out);
-            if (it != Hidden.end()) File << i + In.size() << ">" << std::distance(Hidden.begin(), std::find(Hidden.begin(), Hidden.end(), *ac.Out)) << " ";
-            else File << i + In.size() << ">" << std::distance(Out.begin(), std::find(Out.begin(), Out.end(), *ac.Out)) + Hidden.size() << " ";
+        for (int i = 0; i < In.size(); i++) for (AxonTerminalComponent ac : In[i]->Axon) File << i << ">" << std::distance(Hidden.begin(), std::find(Hidden.begin(), Hidden.end(), ac.Out)) << " ";
+        for (int i = 0; i < Hidden.size(); i++) for (AxonTerminalComponent ac : Hidden[i]->Axon) {
+            auto it = std::find(Hidden.begin(), Hidden.end(), ac.Out);
+            if (it != Hidden.end()) File << i + In.size() << ">" << std::distance(Hidden.begin(), std::find(Hidden.begin(), Hidden.end(), ac.Out)) << " ";
+            else File << i + In.size() << ">" << std::distance(Out.begin(), std::find(Out.begin(), Out.end(), ac.Out)) + Hidden.size() << " ";
         }
         File.close();
     }
