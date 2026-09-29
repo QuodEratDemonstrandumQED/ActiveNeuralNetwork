@@ -8,6 +8,7 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <array>
 #include <vector>
 #include <random>
 #include <unordered_map>
@@ -51,8 +52,8 @@ public:
 
 class NeuralNetwork {
     std::vector<Neuron*> In;
-    std::vector<Neuron*> Out;
     std::vector<Neuron*> Hidden;
+    std::vector<Neuron*> Out;
 public:
     NeuralNetwork(int in, int out, int hidden) {
         for (int i = 0; i < in; i++) In.push_back(new Neuron(InputNeuron));
@@ -93,7 +94,9 @@ public:
         for (int i = 0; i < out; i++) for (int t : OutConnections[i]) Hidden[t]->Axon.push_back(AxonTerminalComponent(Hidden[t], Out[i]));
     }
     NeuralNetwork(std::vector<Neuron*> in, std::vector<Neuron*> hidden, std::vector<Neuron*> out) {
-        
+        In = in;
+        Hidden = hidden;
+        Out = out;
     }
     NeuralNetwork(std::string fpath) {
         std::ifstream File(fpath);
@@ -200,7 +203,8 @@ public:
         File.close();
     }
     NeuralNetwork Clone(bool evolve) {
-
+        // do something here, please!
+        return NeuralNetwork(In.size(), Out.size(), Hidden.size());
     }
 };
 
