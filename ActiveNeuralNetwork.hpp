@@ -176,6 +176,17 @@ public:
             }
         }
     }
+    NeuralNetwork(NeuralNetwork& NN) {
+        for (Neuron* n : NN.In) {
+            In.push_back(new Neuron(*n));
+        }
+        for (Neuron* n : NN.Hidden) {
+                Hidden.push_back(new Neuron(*n));
+        }
+        for (Neuron* n : NN.Out) {
+            Out.push_back(new Neuron(*n));
+        }
+    }
     ~NeuralNetwork() {
         for (Neuron* n : In) delete n;
         for (Neuron* n : Hidden) delete n;
