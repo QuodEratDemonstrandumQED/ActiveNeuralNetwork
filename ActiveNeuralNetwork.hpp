@@ -54,15 +54,14 @@ class NeuralNetwork {
     std::vector<Neuron*> In;
     std::vector<Neuron*> Hidden;
     std::vector<Neuron*> Out;
+    std::unordered_map<int, std::vector<int>> InConnections;
+    std::unordered_map<int, std::vector<int>> Connections;
+    std::unordered_map<int, std::vector<int>> OutConnections;
 public:
     NeuralNetwork(int in, int out, int hidden) {
         for (int i = 0; i < in; i++) In.push_back(new Neuron(InputNeuron));
         for (int i = 0; i < hidden; i++) Hidden.push_back(new Neuron(HiddenNeuron));
         for (int i = 0; i < out; i++) Out.push_back(new Neuron(OutputNeuron));
-
-        std::unordered_map<int, std::vector<int>> InConnections;
-        std::unordered_map<int, std::vector<int>> Connections;
-        std::unordered_map<int, std::vector<int>> OutConnections;
 
         std::random_device rd;
         std::mt19937 gen(rd());
@@ -203,7 +202,14 @@ public:
         File.close();
     }
     NeuralNetwork Clone(bool evolve) {
-        // do something here, please!
+        // TODO: do something here, please!
+        NeuralNetwork clone = NeuralNetwork(*this);
+        for (Neuron* n : clone.In) n->Excitation = 0;
+        for (Neuron* n : clone.Hidden) n->Excitation = 0;
+        for (Neuron* n : clone.Out) n->Excitation = 0;
+
+        std::random_device rd;
+        std::mt19937 gen(rd());
         return NeuralNetwork(In.size(), Out.size(), Hidden.size());
     }
 };
