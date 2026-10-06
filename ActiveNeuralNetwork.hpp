@@ -92,11 +92,6 @@ public:
         for (int i = 0; i < hidden; i++) for (int t : Connections[i]) Hidden[i]->Axon.push_back(AxonTerminalComponent(Hidden[i], Hidden[t]));
         for (int i = 0; i < out; i++) for (int t : OutConnections[i]) Hidden[t]->Axon.push_back(AxonTerminalComponent(Hidden[t], Out[i]));
     }
-    NeuralNetwork(std::vector<Neuron*> in, std::vector<Neuron*> hidden, std::vector<Neuron*> out) {
-        In = in;
-        Hidden = hidden;
-        Out = out;
-    }
     NeuralNetwork(std::string fpath) {
         std::ifstream File(fpath);
         if (!File.is_open()) {
