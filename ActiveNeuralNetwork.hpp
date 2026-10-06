@@ -217,8 +217,7 @@ public:
         if (evolve) {
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::uniform_int_distribution<> dist;
-            std::cout << dist(gen);
+            std::uniform_int_distribution<> dist(0, Hidden.size()-1);
         }
         return clone;
     }
