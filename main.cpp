@@ -5,5 +5,6 @@ int main() {
     NN.Export("TrainingOutput.txt");
     NeuralNetwork NN2 = NeuralNetwork("TrainingOutput.txt");
     NN2.Export("TrainingOutput2.txt");
+    NeuralNetwork NN3 = NN.Clone(true);
     return 0;
 }
