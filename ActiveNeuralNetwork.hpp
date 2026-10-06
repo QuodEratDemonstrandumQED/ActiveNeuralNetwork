@@ -176,7 +176,7 @@ public:
             }
         }
     }
-    NeuralNetwork(NeuralNetwork& NN) {
+    NeuralNetwork(const NeuralNetwork& NN) {
         for (Neuron* n : NN.In) {
             In.push_back(new Neuron(*n));
         }
@@ -225,7 +225,7 @@ public:
             std::uniform_int_distribution<> dist;
             std::cout << dist(gen);
         }
-        return NeuralNetwork(In.size(), Out.size(), Hidden.size());
+        return clone;
     }
 };
 
