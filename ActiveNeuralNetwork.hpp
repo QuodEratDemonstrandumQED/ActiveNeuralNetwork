@@ -197,6 +197,7 @@ public:
         for (Neuron* n : Out) delete n;
     }
     void Export(std::string fpath) {
+        // TODO make axon data also encoded instead of just axon connections.
         std::ofstream File(fpath);
         if (!File.is_open()) {
             std::cerr << "Error creating or opening file with path: " + fpath << std::endl;
@@ -216,36 +217,43 @@ public:
         }
         File.close();
     }
-    NeuralNetwork Clone(std::mt19937 gen, float cRate, float wRate) {
+    NeuralNetwork Clone(std::mt19937& gen, float cRate, float wRate) {
         NeuralNetwork clone = NeuralNetwork(*this);
         for (Neuron* n : clone.In)n->Excitation = 0;
         for (Neuron* n : clone.Hidden) n->Excitation = 0;
         for (Neuron* n : clone.Out) n->Excitation = 0;
 
         if (cRate > 0) {
+            int count = 0;
             std::uniform_real_distribution<float> dist(0, 1);
-            for (Neuron* a : Hidden) for (Neuron* b : Hidden) { if (a != b && dist(gen) < cRate/2) {
+            for (Neuron* a : clone.Hidden) for (Neuron* b : clone.Hidden) if (a != b && dist(gen) < cRate/2) {
                 bool connected = false;
-                for (AxonTerminalComponent at : a->Axon) if (at.Out == b) {
-                    connected = true;
-                    a->Axon.emplace_back(a, b);
-                    break;
+                for (int i = 0; i < a->Axon.size(); i++) {
+                    AxonTerminalComponent ac = a->Axon[i];
+                    if (ac.Out == b) {
+                        connected = true;
+                        b->Axon.erase(b->Axon.begin() + i);
+                        break;
+                    }
                 }
                 if (!connected) {
-                    for (AxonTerminalComponent at : b->Axon) if (at.Out == a) {
-                        connected = true;
-                        a->Axon.emplace_back(a, b);
-                        break;
+                    for (int i = 0; i < b->Axon.size(); i++) {
+                        AxonTerminalComponent ac = b->Axon[i];
+                        if (ac.Out == a) {
+                            connected = true;
+                            a->Axon.erase(a->Axon.begin() + i);
+                            break;
+                        }
                     }
                     if (!connected) a->Axon.emplace_back(a, b);
                 }
-            } }
+            }
         }
         if (wRate > 0) {
             std::random_device rd;
             std::mt19937 gen(rd());
             std::uniform_real_distribution<float> dist(-wRate, wRate);
-            for (Neuron* a : Hidden) for (AxonTerminalComponent at : a->Axon) at.Weight += dist(gen);
+            for (Neuron* a : clone.Hidden) for (AxonTerminalComponent at : a->Axon) at.Weight += dist(gen);
         }
         return clone;
     }
