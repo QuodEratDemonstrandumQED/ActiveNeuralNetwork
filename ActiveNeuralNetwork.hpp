@@ -190,6 +190,15 @@ public:
                 at.Out = Hidden[std::distance(NN.Hidden.begin(), it)];
             } else at.Out = Out[std::distance(NN.Out.begin(), std::find(NN.Out.begin(), NN.Out.end(), at.Out))];
         }
+
+
+        for (Neuron* n : NN.In) for (AxonTerminalComponent at : n->Axon) std::cout << std::distance(NN.Hidden.begin(), std::find(NN.Hidden.begin(), NN.Hidden.end(), at.Out)) << std::endl;
+        for (Neuron* n : NN.Hidden) for (AxonTerminalComponent at : n->Axon) {
+            auto it = std::find(NN.Hidden.begin(), NN.Hidden.end(), at.Out);
+            if (it != NN.Hidden.end()) {
+                std::cout << std::distance(NN.Hidden.begin(), it) << std::endl;
+            } else std::cout << std::distance(NN.Out.begin(), std::find(NN.Out.begin(), NN.Out.end(), at.Out)) << std::endl;
+        }
     }
     ~NeuralNetwork() {
         for (Neuron* n : In) delete n;
@@ -219,7 +228,7 @@ public:
     }
     NeuralNetwork Clone(std::mt19937& gen, float cRate, float wRate) {
         NeuralNetwork clone = NeuralNetwork(*this);
-        for (Neuron* n : clone.In)n->Excitation = 0;
+        for (Neuron* n : clone.In) n->Excitation = 0;
         for (Neuron* n : clone.Hidden) n->Excitation = 0;
         for (Neuron* n : clone.Out) n->Excitation = 0;
 
