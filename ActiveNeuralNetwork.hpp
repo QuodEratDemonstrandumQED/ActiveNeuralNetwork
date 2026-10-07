@@ -13,6 +13,7 @@
 #include <random>
 #include <unordered_map>
 #include <algorithm>
+#include <iterator>
 
 
 
@@ -177,10 +178,17 @@ public:
             In.push_back(new Neuron(*n));
         }
         for (Neuron* n : NN.Hidden) {
-                Hidden.push_back(new Neuron(*n));
+            Hidden.push_back(new Neuron(*n));
         }
         for (Neuron* n : NN.Out) {
             Out.push_back(new Neuron(*n));
+        }
+        for (Neuron* n : NN.In) for (AxonTerminalComponent at : n->Axon) at.Out = Hidden[std::distance(NN.Hidden.begin(), std::find(NN.Hidden.begin(), NN.Hidden.end(), at.Out))];
+        for (Neuron* n : NN.Hidden) for (AxonTerminalComponent at : n->Axon) {
+            auto it = std::find(NN.Hidden.begin(), NN.Hidden.end(), at.Out);
+            if (it != NN.Hidden.end()) {
+                at.Out = Hidden[std::distance(NN.Hidden.begin(), it)];
+            } else at.Out = Out[std::distance(NN.Out.begin(), std::find(NN.Out.begin(), NN.Out.end(), at.Out))];
         }
     }
     ~NeuralNetwork() {
