@@ -54,11 +54,12 @@ class NeuralNetwork {
     std::vector<Neuron*> In;
     std::vector<Neuron*> Hidden;
     std::vector<Neuron*> Out;
-    std::unordered_map<int, std::vector<int>> InConnections;
-    std::unordered_map<int, std::vector<int>> Connections;
-    std::unordered_map<int, std::vector<int>> OutConnections;
 public:
     NeuralNetwork(int in, int out, int hidden) {
+        std::unordered_map<int, std::vector<int>> InConnections;
+        std::unordered_map<int, std::vector<int>> Connections;
+        std::unordered_map<int, std::vector<int>> OutConnections;
+
         for (int i = 0; i < in; i++) In.push_back(new Neuron(InputNeuron));
         for (int i = 0; i < hidden; i++) Hidden.push_back(new Neuron(HiddenNeuron));
         for (int i = 0; i < out; i++) Out.push_back(new Neuron(OutputNeuron));
@@ -207,17 +208,36 @@ public:
         }
         File.close();
     }
-    NeuralNetwork Clone(bool evolve) {
-        // TODO: do something here, please!
+    NeuralNetwork Clone(std::mt19937 gen, float cRate, float wRate) {
         NeuralNetwork clone = NeuralNetwork(*this);
         for (Neuron* n : clone.In)n->Excitation = 0;
         for (Neuron* n : clone.Hidden) n->Excitation = 0;
         for (Neuron* n : clone.Out) n->Excitation = 0;
 
-        if (evolve) {
+        if (cRate > 0) {
+            std::uniform_real_distribution<float> dist(0, 1);
+            for (Neuron* a : Hidden) for (Neuron* b : Hidden) { if (a != b && dist(gen) < cRate/2) {
+                bool connected = false;
+                for (AxonTerminalComponent at : a->Axon) if (at.Out == b) {
+                    connected = true;
+                    a->Axon.emplace_back(a, b);
+                    break;
+                }
+                if (!connected) {
+                    for (AxonTerminalComponent at : b->Axon) if (at.Out == a) {
+                        connected = true;
+                        a->Axon.emplace_back(a, b);
+                        break;
+                    }
+                    if (!connected) a->Axon.emplace_back(a, b);
+                }
+            } }
+        }
+        if (wRate > 0) {
             std::random_device rd;
             std::mt19937 gen(rd());
-            std::uniform_int_distribution<> dist(0, Hidden.size()-1);
+            std::uniform_real_distribution<float> dist(-wRate, wRate);
+            for (Neuron* a : Hidden) for (AxonTerminalComponent at : a->Axon) at.Weight += dist(gen);
         }
         return clone;
     }

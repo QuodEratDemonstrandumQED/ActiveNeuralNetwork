@@ -5,6 +5,9 @@ int main() {
     NN.Export("TrainingOutput.txt");
     NeuralNetwork NN2 = NeuralNetwork("TrainingOutput.txt");
     NN2.Export("TrainingOutput2.txt");
-    NeuralNetwork NN3 = NN.Clone(true);
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    NeuralNetwork NN3 = NN.Clone(gen, 0.1, 0.05);
+    NN3.Export("TrainingOutput3.txt");
     return 0;
 }
