@@ -30,6 +30,7 @@ public:
     float MyelinSheath;
     std::vector<std::array<float, 2>> Signals;
     AxonTerminalComponent(Neuron* in, Neuron* out) : In(in), Out(out), Weight(1), MyelinSheath(1) { }
+    AxonTerminalComponent(Neuron* in, Neuron* out, float weight, float myelin_sheath) : In(in), Out(out), Weight(weight), MyelinSheath(myelin_sheath) { }
 };
 
 typedef std::vector<AxonTerminalComponent> AxonComponent;
@@ -152,24 +153,35 @@ public:
             if (breakout) break;
         }
         working_on = "";
-        int a;
+        int a = 0;
+        int b = 0;
+        float w = 0;
         for (int i = o; i < FileContents.length(); i++) {
             char c = FileContents[i];
             switch (c) {
             case '>':
-                    a = std::stoi(working_on);
+                a = std::stoi(working_on);
+                working_on = "";
+                break;
+            case ' ': {
+                if (working_on.empty()) break;
+                if (b == 0) {
+                    b = std::stoi(working_on);
                     working_on = "";
-                    break;
-                case ' ': {
-                    if (working_on.empty()) break;
-                    int b = std::stoi(working_on);
+                } else if (w == 0) {
+                    w = std::stof(working_on);
                     working_on = "";
-                    if (a < In.size()) In[a]->Axon.emplace_back(In[a], Hidden[b]);
-                    else if (b >= Hidden.size()) Hidden[a - In.size()]->Axon.emplace_back(Hidden[a - In.size()], Out[b - Hidden.size()]);
-                    else Hidden[a - In.size()]->Axon.emplace_back(Hidden[a - In.size()], Hidden[b]);
+                } else {
+                    float ms = std::stof(working_on);
+                    working_on = "";
+                    if (a < In.size()) In[a]->Axon.emplace_back(In[a], Hidden[b], w, ms);
+                    else if (b >= Hidden.size()) Hidden[a - In.size()]->Axon.emplace_back(Hidden[a - In.size()], Out[b - Hidden.size()], w, ms);
+                    else Hidden[a - In.size()]->Axon.emplace_back(Hidden[a - In.size()], Hidden[b], w, ms);
+                    a = 0; b = 0; w = 0; ms = 0;
                     break;
-                } default:
-                    working_on += c;
+                }
+            } default:
+                working_on += c;
             }
         }
     }
@@ -197,7 +209,6 @@ public:
         for (Neuron* n : Out) delete n;
     }
     void Export(std::string fpath) {
-        // TODO make axon data also encoded instead of just axon connections.
         std::ofstream File(fpath);
         if (!File.is_open()) {
             std::cerr << "Error creating or opening file with path: " + fpath << std::endl;
@@ -209,11 +220,12 @@ public:
         File << "| ";
         for (Neuron* n : Out) File << n->ActivationThreshold << " " << n->LeakRate << " ";
         File << "~ ";
-        for (int i = 0; i < In.size(); i++) for (AxonTerminalComponent ac : In[i]->Axon) File << i << ">" << std::distance(Hidden.begin(), std::find(Hidden.begin(), Hidden.end(), ac.Out)) << " ";
+        for (int i = 0; i < In.size(); i++) for (AxonTerminalComponent ac : In[i]->Axon) File << i << ">" << std::distance(Hidden.begin(), std::find(Hidden.begin(), Hidden.end(), ac.Out)) << " " << ac.Weight << " " << ac.MyelinSheath << " ";
         for (int i = 0; i < Hidden.size(); i++) for (AxonTerminalComponent ac : Hidden[i]->Axon) {
             auto it = std::find(Hidden.begin(), Hidden.end(), ac.Out);
             if (it != Hidden.end()) File << i + In.size() << ">" << std::distance(Hidden.begin(), std::find(Hidden.begin(), Hidden.end(), ac.Out)) << " ";
             else File << i + In.size() << ">" << std::distance(Out.begin(), std::find(Out.begin(), Out.end(), ac.Out)) + Hidden.size() << " ";
+            File << ac.Weight << " " << ac.MyelinSheath << " ";
         }
         File.close();
     }
