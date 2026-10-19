@@ -14,6 +14,7 @@
 #include <unordered_map>
 #include <algorithm>
 #include <iterator>
+#include <utility>
 
 
 
@@ -47,15 +48,20 @@ public:
     float Excitation;
     float ActivationThreshold;
     float LeakRate;
-    Neuron(NeuronType type) : Type(type), Excitation(0), ActivationThreshold(1), LeakRate(1) { }
-    Neuron(NeuronType type, float activation_threshold, float leak_rate) : Type(type), Excitation(0), ActivationThreshold(activation_threshold), LeakRate(leak_rate) { }
+    float TimeSinceLastSignal;
+    Neuron(NeuronType type) : Type(type), Excitation(0), ActivationThreshold(1), LeakRate(1), TimeSinceLastSignal(0) { }
+    Neuron(NeuronType type, float activation_threshold, float leak_rate) : Type(type), Excitation(0), ActivationThreshold(activation_threshold), LeakRate(leak_rate), TimeSinceLastSignal(0) { }
 };
 
 
+/**
+ * @brief A neural network.
+ */
 class NeuralNetwork {
     std::vector<Neuron*> In;
     std::vector<Neuron*> Hidden;
     std::vector<Neuron*> Out;
+    float ShortestPath;
 public:
     NeuralNetwork(int in, int out, int hidden) {
         std::unordered_map<int, std::vector<int>> InConnections;
@@ -94,6 +100,8 @@ public:
         for (int i = 0; i < in; i++) for (int t : InConnections[i]) In[i]->Axon.push_back(AxonTerminalComponent(In[i], Hidden[t]));
         for (int i = 0; i < hidden; i++) for (int t : Connections[i]) Hidden[i]->Axon.push_back(AxonTerminalComponent(Hidden[i], Hidden[t]));
         for (int i = 0; i < out; i++) for (int t : OutConnections[i]) Hidden[t]->Axon.push_back(AxonTerminalComponent(Hidden[t], Out[i]));
+
+        ShortestPath = 1.0f;
     }
     NeuralNetwork(std::string fpath) {
         std::ifstream File(fpath);
@@ -105,6 +113,7 @@ public:
         buf << File.rdbuf();
         std::string FileContents = buf.str();
         File.close();
+        ShortestPath = -1.0f;
         NeuronType cType = InputNeuron;
         float ActivationThreshold = 0;
         std::string working_on = "";
@@ -173,6 +182,8 @@ public:
                     working_on = "";
                 } else {
                     float ms = std::stof(working_on);
+                    if (ShortestPath != 0.0f) ShortestPath = std::min(ShortestPath, 1.0f/ms);
+                    else ShortestPath = 1.0f/ms;
                     working_on = "";
                     if (a < In.size()) In[a]->Axon.emplace_back(In[a], Hidden[b], w, ms);
                     else if (b >= Hidden.size()) Hidden[a - In.size()]->Axon.emplace_back(Hidden[a - In.size()], Out[b - Hidden.size()], w, ms);
@@ -263,9 +274,46 @@ public:
         }
         if (wRate > 0) {
             std::uniform_real_distribution<float> dist(-wRate, wRate);
-            for (Neuron*& a : clone.Hidden) for (AxonTerminalComponent& at : a->Axon) at.Weight += dist(gen);
+            for (Neuron*& a : clone.Hidden) for (AxonTerminalComponent& at : a->Axon) {
+                at.Weight += dist(gen);
+                at.MyelinSheath += dist(gen);
+                at.MyelinSheath = std::abs(at.MyelinSheath);
+                if (at.MyelinSheath < 0.1) at.MyelinSheath = 0.1;
+            }
         }
+        clone.ShortestPath = 0.0f;
+        for (Neuron*& n : clone.In) for (AxonTerminalComponent& ac : n->Axon)
+            if (clone.ShortestPath != 0.0f) clone.ShortestPath = std::min(clone.ShortestPath, 1.0f/ac.MyelinSheath);
+            else clone.ShortestPath = 1.0f/ac.MyelinSheath;
         return clone;
+    }
+    std::vector<std::array<float, 2>> Step(float& timestep, std::vector<std::pair<AxonTerminalComponent*, int>>& stored_signals, std::vector<Neuron*> ExcitedNeurons) {
+        timestep = ShortestPath;
+        std::vector<std::array<float, 2>> output;
+        if (stored_signals.size() == 0) {
+            for (Neuron*& n : In) for (AxonTerminalComponent ac : n->Axon) if (ac.Signals.size() != 0) for (int i = 0; i < ac.Signals.size(); i++) stored_signals.push_back({&ac, i});
+            for (Neuron*& n : Hidden) for (AxonTerminalComponent ac : n->Axon) if (ac.Signals.size() != 0) for (int i = 0; i < ac.Signals.size(); i++) stored_signals.push_back({&ac, i});
+        }
+        std::vector<AxonTerminalComponent*> new_signals;
+        std::vector<int> removed_indices;
+        for (std::pair<AxonTerminalComponent*, int>& acp : stored_signals) {
+            AxonTerminalComponent* ac = acp.first;
+            std::array<float, 2> s = ac->Signals[acp.second];
+            s[1] += timestep;
+            if (s[1] >= 1/ac->MyelinSheath) {
+                ac->Out->Excitation += s[1]-1;
+                if (ac->Out->Excitation >= ac->Out->ActivationThreshold) {
+                    ac->Out->TimeSinceLastSignal = 0;
+                    //ac->Out->Excitation -= ac->Out->ActivationThreshold;
+                }
+                s[1] = 0;
+            }
+        }
+
+        std::sort(stored_signals.begin(), stored_signals.end(), [](const std::pair<AxonTerminalComponent*, int>& a, const std::pair<AxonTerminalComponent*, int>& b) {
+            return a.first->Signals[a.second] < b.first->Signals[b.second];
+        });
+        return output;
     }
 };
 
