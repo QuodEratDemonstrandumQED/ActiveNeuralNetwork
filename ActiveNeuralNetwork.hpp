@@ -15,8 +15,15 @@
 #include <algorithm>
 #include <iterator>
 #include <utility>
+#include <ranges>
+#include <cmath>
 
 
+
+struct Signal {
+    float Time;
+    int Index;
+};
 
 class Neuron;
 
@@ -29,7 +36,7 @@ public:
     Neuron* Out;
     float Weight;
     float MyelinSheath;
-    std::vector<std::array<float, 2>> Signals;
+    std::vector<Signal> Signals;
     AxonTerminalComponent(Neuron* in, Neuron* out) : In(in), Out(out), Weight(1), MyelinSheath(1) { }
     AxonTerminalComponent(Neuron* in, Neuron* out, float weight, float myelin_sheath) : In(in), Out(out), Weight(weight), MyelinSheath(myelin_sheath) { }
 };
@@ -49,8 +56,15 @@ public:
     float ActivationThreshold;
     float LeakRate;
     float TimeSinceLastSignal;
-    Neuron(NeuronType type) : Type(type), Excitation(0), ActivationThreshold(1), LeakRate(1), TimeSinceLastSignal(0) { }
-    Neuron(NeuronType type, float activation_threshold, float leak_rate) : Type(type), Excitation(0), ActivationThreshold(activation_threshold), LeakRate(leak_rate), TimeSinceLastSignal(0) { }
+    std::vector<std::array<float, 2>> RecievedSignals;
+    Neuron(NeuronType type) : Type(type), Excitation(0), ActivationThreshold(1), LeakRate(1), TimeSinceLastSignal(1e9) { }
+    Neuron(NeuronType type, float activation_threshold, float leak_rate) : Type(type), Excitation(0), ActivationThreshold(activation_threshold), LeakRate(leak_rate), TimeSinceLastSignal(1e9) { }
+    Neuron(const Neuron& n) : Excitation(0.0f), TimeSinceLastSignal(1e9) {
+        Type = n.Type;
+        Axon = n.Axon;
+        ActivationThreshold = n.ActivationThreshold;
+        LeakRate = n.LeakRate;
+    }
 };
 
 
@@ -294,24 +308,44 @@ public:
             for (Neuron*& n : In) for (AxonTerminalComponent ac : n->Axon) if (ac.Signals.size() != 0) for (int i = 0; i < ac.Signals.size(); i++) stored_signals.push_back({&ac, i});
             for (Neuron*& n : Hidden) for (AxonTerminalComponent ac : n->Axon) if (ac.Signals.size() != 0) for (int i = 0; i < ac.Signals.size(); i++) stored_signals.push_back({&ac, i});
         }
-        std::vector<AxonTerminalComponent*> new_signals;
+        std::vector<std::pair<AxonTerminalComponent*, int>> new_signals;
         std::vector<int> removed_indices;
-        for (std::pair<AxonTerminalComponent*, int>& acp : stored_signals) {
-            AxonTerminalComponent* ac = acp.first;
-            std::array<float, 2> s = ac->Signals[acp.second];
-            s[1] += timestep;
-            if (s[1] >= 1/ac->MyelinSheath) {
-                ac->Out->Excitation += s[1]-1;
-                if (ac->Out->Excitation >= ac->Out->ActivationThreshold) {
-                    ac->Out->TimeSinceLastSignal = 0;
-                    //ac->Out->Excitation -= ac->Out->ActivationThreshold;
+        for (int i = 0; i < stored_signals.size(); ++i) {
+            std::pair<AxonTerminalComponent*, int>& acp = stored_signals[i];
+            AxonTerminalComponent*& ac = acp.first;
+            Signal& s = ac->Signals[acp.second];
+            s.Time += timestep;
+            float st = 1/ac->MyelinSheath;
+            if (s.Time >= st) {
+                ac->Out->Excitation += ac->Weight;
+                if (ac->Out->Excitation - (timestep - st) * ac->Out->LeakRate >= ac->Out->ActivationThreshold) {
+                    ac->Out->TimeSinceLastSignal = s.Time - st;
+                    if (ac->Out->Type == OutputNeuron) output.push_back({1, s.Time - st});
+                    else for (AxonTerminalComponent& at : ac->Out->Axon) {
+                        int index = at.Signals.size();
+                        at.Signals.push_back({s.Time - st, index});
+                        new_signals.push_back({&at, index});
+                    }
                 }
-                s[1] = 0;
+                for (int i = s.Index; i < ac->Signals.size(); i++) ac->Signals[i].Index--;
+                ac->Signals.erase(ac->Signals.begin() + s.Index);
+                removed_indices.push_back(i);
             }
         }
+        for (Neuron* n : Hidden) {
+            if (n->Excitation > 0.0f) n->Excitation = std::max(n->Excitation - n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
+            else if (n->Excitation < 0.0f) n->Excitation = std::min(n->Excitation + n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
+        }
+        for (Neuron* n : Out) {
+            if (n->Excitation > 0.0f) n->Excitation = std::max(n->Excitation - n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
+            else if (n->Excitation < 0.0f) n->Excitation = std::min(n->Excitation + n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
+        }
 
+        for (const int& i : std::views::reverse(removed_indices)) removed_indices.erase(removed_indices.begin() + i);
+        stored_signals.reserve(stored_signals.size() + new_signals.size());
+        stored_signals.insert(stored_signals.end(), new_signals.begin(), new_signals.end());
         std::sort(stored_signals.begin(), stored_signals.end(), [](const std::pair<AxonTerminalComponent*, int>& a, const std::pair<AxonTerminalComponent*, int>& b) {
-            return a.first->Signals[a.second] < b.first->Signals[b.second];
+            return (1.0f/a.first->MyelinSheath)-a.first->Signals[a.second].Time < (1.0f/b.first->MyelinSheath)-b.first->Signals[b.second].Time;
         });
         return output;
     }
