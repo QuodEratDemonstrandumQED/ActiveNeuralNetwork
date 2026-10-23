@@ -65,6 +65,20 @@ public:
         ActivationThreshold = n.ActivationThreshold;
         LeakRate = n.LeakRate;
     }
+
+    float ExcitationLoss(float timestep) {
+        float time = 0;
+        for (std::array<float, 2> signal : RecievedSignals) {
+            float t = signal[0] - time;
+            if (Excitation > 0.0f) Excitation = std::max(Excitation - LeakRate * std::min(TimeSinceLastSignal, t), 0.0f);
+            else if (Excitation < 0.0f) Excitation = std::min(Excitation + LeakRate * std::min(TimeSinceLastSignal, timestep), 0.0f);
+            time = signal[0];
+            Excitation += signal[1];
+        }
+        float t = timestep-time;
+        if (Excitation > 0.0f) Excitation = std::max(Excitation - LeakRate * std::min(TimeSinceLastSignal, t), 0.0f);
+        else if (Excitation < 0.0f) Excitation = std::min(Excitation + LeakRate * std::min(TimeSinceLastSignal, timestep), 0.0f);
+    }
 };
 
 
@@ -325,6 +339,7 @@ public:
                         int index = at.Signals.size();
                         at.Signals.push_back({s.Time - st, index});
                         new_signals.push_back({&at, index});
+                        ac->Out->RecievedSignals.push_back({s.Time - st, at.Weight});
                     }
                 }
                 for (int i = s.Index; i < ac->Signals.size(); i++) ac->Signals[i].Index--;
