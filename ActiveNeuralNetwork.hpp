@@ -333,15 +333,16 @@ public:
             s.Time += timestep;
             float st = 1/ac->MyelinSheath;
             if (s.Time >= st) {
+                float dt = s.Time - st;
                 ac->Out->Excitation += ac->Weight;
-                if (ac->Out->Excitation - (timestep - st) * ac->Out->LeakRate >= ac->Out->ActivationThreshold) {
-                    ac->Out->TimeSinceLastSignal = s.Time - st;
-                    if (ac->Out->Type == OutputNeuron) output.push_back({1, s.Time - st});
+                if (ac->Out->ExcitationLoss(dt) >= ac->Out->ActivationThreshold) {
+                    ac->Out->TimeSinceLastSignal = dt;
+                    if (ac->Out->Type == OutputNeuron) output.push_back({1, dt});
                     else for (AxonTerminalComponent& at : ac->Out->Axon) {
                         int index = at.Signals.size();
-                        at.Signals.push_back({s.Time - st, index});
+                        at.Signals.push_back({dt, index});
                         new_signals.push_back({&at, index});
-                        ac->Out->RecievedSignals.push_back({s.Time - st, at.Weight});
+                        ac->Out->RecievedSignals.push_back({dt, at.Weight});
                     }
                 }
                 for (int i = s.Index; i < ac->Signals.size(); i++) ac->Signals[i].Index--;
@@ -349,8 +350,14 @@ public:
                 removed_indices.push_back(i);
             }
         }
-        for (Neuron* n : Hidden) n->Excitation = n->ExcitationLoss(timestep);
-        for (Neuron* n : Out) n->Excitation = n->ExcitationLoss(timestep);
+        for (Neuron* n : Hidden) {
+            n->Excitation = n->ExcitationLoss(timestep);
+            n->RecievedSignals.clear();
+        }
+        for (Neuron* n : Out) {
+            n->Excitation = n->ExcitationLoss(timestep);
+            n->RecievedSignals.clear();
+        }
 
         for (const int& i : std::views::reverse(removed_indices)) removed_indices.erase(removed_indices.begin() + i);
         stored_signals.reserve(stored_signals.size() + new_signals.size());
