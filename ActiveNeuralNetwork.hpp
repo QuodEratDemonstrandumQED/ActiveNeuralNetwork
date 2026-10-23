@@ -67,17 +67,19 @@ public:
     }
 
     float ExcitationLoss(float timestep) {
+        float excitation = Excitation;
         float time = 0;
         for (std::array<float, 2> signal : RecievedSignals) {
             float t = signal[0] - time;
-            if (Excitation > 0.0f) Excitation = std::max(Excitation - LeakRate * std::min(TimeSinceLastSignal, t), 0.0f);
-            else if (Excitation < 0.0f) Excitation = std::min(Excitation + LeakRate * std::min(TimeSinceLastSignal, timestep), 0.0f);
+            if (excitation > 0.0f) excitation = std::max(excitation - LeakRate * t, 0.0f);
+            else if (excitation < 0.0f) excitation = std::min(excitation + LeakRate * t, 0.0f);
             time = signal[0];
-            Excitation += signal[1];
+            excitation += signal[1];
         }
         float t = timestep-time;
-        if (Excitation > 0.0f) Excitation = std::max(Excitation - LeakRate * std::min(TimeSinceLastSignal, t), 0.0f);
-        else if (Excitation < 0.0f) Excitation = std::min(Excitation + LeakRate * std::min(TimeSinceLastSignal, timestep), 0.0f);
+        if (excitation > 0.0f) excitation = std::max(excitation - LeakRate * t, 0.0f);
+        else if (excitation < 0.0f) excitation = std::min(excitation + LeakRate * t, 0.0f);
+        return excitation;
     }
 };
 
@@ -347,14 +349,8 @@ public:
                 removed_indices.push_back(i);
             }
         }
-        for (Neuron* n : Hidden) {
-            if (n->Excitation > 0.0f) n->Excitation = std::max(n->Excitation - n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
-            else if (n->Excitation < 0.0f) n->Excitation = std::min(n->Excitation + n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
-        }
-        for (Neuron* n : Out) {
-            if (n->Excitation > 0.0f) n->Excitation = std::max(n->Excitation - n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
-            else if (n->Excitation < 0.0f) n->Excitation = std::min(n->Excitation + n->LeakRate * std::min(n->TimeSinceLastSignal, timestep), 0.0f);
-        }
+        for (Neuron* n : Hidden) n->Excitation = n->ExcitationLoss(timestep);
+        for (Neuron* n : Out) n->Excitation = n->ExcitationLoss(timestep);
 
         for (const int& i : std::views::reverse(removed_indices)) removed_indices.erase(removed_indices.begin() + i);
         stored_signals.reserve(stored_signals.size() + new_signals.size());
