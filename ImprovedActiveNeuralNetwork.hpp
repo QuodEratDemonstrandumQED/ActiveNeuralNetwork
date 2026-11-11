@@ -50,7 +50,7 @@ namespace QED {
 			Axon* Sender;
 			float Weight;
 		public:
-			Telodendron(Neuron*& tgt, Axon*& snd, float wgt) : Target(tgt), Sender(snd), Weight(wgt) { }
+			Telodendron(Neuron*& tgt, Axon* snd, float wgt) : Target(tgt), Sender(snd), Weight(wgt) { }
 
 			/**
 			 * @brief Creates a copy of the Telodendron.
@@ -92,8 +92,8 @@ namespace QED {
 			std::vector<Signal> Signals;
 			Neuron* Sender;
 		public:
-			Axon(std::vector<Telodendron>& tda, float wgt, Neuron* sender) : Telodendria(tda), Weight(wgt), Sender(sender) { }
-			Axon(Neuron* sender) : Weight(1), Sender(sender) { }
+			Axon(std::vector<Telodendron>& tda, float wgt, Neuron* sender) : Telodendria(tda), MyelinSheath(3), Weight(wgt), Sender(sender) { }
+			Axon(Neuron* sender) : MyelinSheath(3), Weight(1), Sender(sender) { }
 
 			/**
 			 * @brief Sends a Signal down the Axon.
@@ -202,9 +202,9 @@ namespace QED {
 			 * @param gen The Mersenne Twister 19937 Pseudo-Random Number Generator used to randomise the inter-Neuronal connections and weights of the Neural Network.
 			 */
 			NeuralNetwork(unsigned inputs, unsigned hidden, unsigned outputs, std::mt19937& gen) {
-				for (int i = 0; i < inputs; ++i) Input.emplace_back(i, InputNeuron);
-				for (int i = 0; i < hidden; ++i) Hidden.emplace_back(i, HiddenNeuron);
-				for (int i = 0; i < outputs; ++i) Output.emplace_back(i, OutputNeuron);
+				for (unsigned i = 0; i < inputs; ++i) Input.push_back(new Neuron(i, InputNeuron));
+				for (unsigned i = 0; i < hidden; ++i) Hidden.push_back(new Neuron(i, HiddenNeuron));
+				for (unsigned i = 0; i < outputs; ++i) Output.push_back(new Neuron(i, OutputNeuron));
 
 				std::uniform_int_distribution<unsigned> iDist(0, inputs);
 				std::uniform_int_distribution<unsigned> hDist(0, hidden);
